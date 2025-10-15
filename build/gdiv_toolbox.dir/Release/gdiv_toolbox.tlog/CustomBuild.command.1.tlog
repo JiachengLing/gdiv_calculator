@@ -1,0 +1,10 @@
+^E:\GDIV_CALCULATOR\CMAKELISTS.TXT
+setlocal
+C:\Users\xingy\anaconda3\Lib\site-packages\cmake\data\bin\cmake.exe -SE:/gdiv_calculator -BE:/gdiv_calculator/build --check-stamp-file E:/gdiv_calculator/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
