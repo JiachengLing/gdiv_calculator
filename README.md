@@ -18,7 +18,7 @@ Core features include:
 - Memory-efficient block reading for large rasters
 
 ## Directory Structure
-
+```
 gdiv_calculator/
 ├── CMakeLists.txt
 ├── include/
@@ -36,6 +36,8 @@ gdiv_calculator/
 │ └── T5FPCF.tiff # An example raster dataset
 └── dist/
 └── Release/ # Compiled DLLs and executables
+```
+
 
 ---
 
