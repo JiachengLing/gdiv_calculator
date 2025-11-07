@@ -1,50 +1,80 @@
 #include "gdiv_toolbox.h"
+#include "gdiv_utils.h"
 #include <gdal_priv.h>
-#include <cpl_conv.h>
-#include <cmath>
-#include <vector>
-#include <iostream>
+#include <cpl_error.h>
+#include <stdexcept>
 
-static inline bool prefer_full_read(GDALRasterBand* band, const RasterOptions* opt, size_t elem_size) {
-    const int w = band->GetXSize(), h = band->GetYSize();
-    uint64_t need = (uint64_t)w * (uint64_t)h * (uint64_t)elem_size;
+// ==========
+int msr_compute(const char* path, const RasterOptions* opt,
+                double* mean, double* stdv, double* vmin, double* vmax, uint64_t* valid);
 
-    uint64_t limit = (opt && opt->max_bytes_simple) ? opt->max_bytes_simple : (uint64_t)256 * 1024 * 1024; // 256MB
-    return need <= limit;
+int shdi_compute(
+  const char* path,
+  const double* classes, int n_classes,
+  const RasterOptions* opt,
+  double* out_shdi,
+  double* probs,
+  uint64_t* out_valid
+);
+
+int lsi_compute(const char* path, const RasterOptions* opt,
+                double* out_lsi, uint64_t* out_valid);
+
+// ===========================================================
+
+static void gdal_init_once() {
+    static bool inited = false;
+    if (!inited) { GDALAllRegister(); inited = true; }
 }
 
-int gdiv_calculate_msr(const char* path, const RasterOptions* opt,
-                       double* mean, double* stdv, double* vmin, double* vmax, uint64_t* valid)
-{
-    GDALAllRegister();
-    GDALDataset* ds = (GDALDataset*) GDALOpen(path, GA_ReadOnly);
-    if (!ds) return 1;
-
-    GDALRasterBand* band = ds->GetRasterBand(1);
-    int w = band->GetXSize(), h = band->GetYSize();
-
-    std::vector<double> data((size_t)w*h);
-    if (band->RasterIO(GF_Read, 0,0,w,h, data.data(), w,h, GDT_Float64, 0,0) != CE_None) {
-        GDALClose(ds);
-        return 2;
-    }
-
-    double sum=0, sq=0;
-    double mn=INFINITY, mx=-INFINITY;
-    uint64_t n=0;
-
-    for (double v : data) {
-        if (!std::isfinite(v)) continue;
-        sum+=v; sq+=v*v; ++n;
-        if (v<mn) mn=v;
-        if (v>mx) mx=v;
-    }
-
-    if (n==0) { GDALClose(ds); return 3; }
-    *mean = sum/n;
-    *stdv = std::sqrt((sq/n) - (*mean)*(*mean));
-    *vmin = mn; *vmax = mx; *valid = n;
-
-    GDALClose(ds);
-    return 0;
+static void set_gdal_throw() {
+    CPLSetErrorHandler([](CPLErr, int, const char* msg){
+        throw std::runtime_error(msg ? msg : "GDAL error");
+    });
 }
+
+extern "C" {
+
+    // --- MSR ---
+    GDIV_API int gdiv_calculate_msr(const char* path, const RasterOptions* opt,
+                                    double* mean, double* stdv, double* vmin, double* vmax, uint64_t* valid)
+    {
+        try {
+            gdal_init_once();
+            set_gdal_throw();
+            return msr_compute(path, opt, mean, stdv, vmin, vmax, valid);
+        } catch (...) {
+            return 9;
+        }
+    }
+
+    // --- SHDI ---
+    GDIV_API int gdiv_calculate_shdi(const char* path,
+                                     const double* classes, int n_classes,
+                                     const RasterOptions* opt,
+                                     double* out_shdi, double* probs, uint64_t* out_valid)
+    {
+        try {
+            gdal_init_once();
+            set_gdal_throw();
+            return shdi_compute(path, classes, n_classes, opt, out_shdi, probs, out_valid);
+        } catch (...) {
+            return 9;
+        }
+    }
+
+    // --- LSI ---
+    GDIV_API int gdiv_calculate_lsi(const char* path,
+                                    const RasterOptions* opt,
+                                    double* out_lsi, uint64_t* out_valid)
+    {
+        try {
+            gdal_init_once();
+            set_gdal_throw();
+            return lsi_compute(path, opt, out_lsi, out_valid);
+        } catch (...) {
+            return 9;
+        }
+    }
+
+} // extern "C"
