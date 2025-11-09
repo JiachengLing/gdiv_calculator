@@ -99,7 +99,7 @@ python compile_gdiv.py
 # What is does:
 - Scans all subfolders under `DATA/` (each factor = one folder)
 - For each site (raster file), computes:
-  - `{factor}_msr` (standard deviation)
+  - `{factor}_msr` (variance of env factor)
   - `{factor}_mean`
   - `{factor}_shdi`(if factor categorical and in SHDI whitelist)
   - `{factor}_lsi`(if factor in LSI whitelist)
