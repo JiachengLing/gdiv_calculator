@@ -1,41 +1,53 @@
-# gdiv_calculator 
+# gdiv_calculator (v 1.1)
 
-This is a C++ geodiversity (spatial metrics) calculation toolbox for raster analysis,
-designed to compute spatial indices including mean, standard deviation, shannon diversity index of geoelements and landscape shape index using the GDAL library.
-Functions can be extended in the future.
+A modular C++ geodiversity (spatial metrics) calculation toolbox for raster-based environmental analysis.
+It computes spatial indices such as mean, standard deviation (MSR), Shannon Diversity Index (SHDI),
+and Landscape Shape Index (LSI) using the GDAL library,
+with a ready-to-use Python interface example for CSV generation.
 
 ---
 ## Description
 
-`gdiv_calculator` provides a set of tools for environmental and biodiversity studies.  
-It currently supports calculating statistical metrics (mean, std, min, max, count) from single-band rasters,  
-now it support landscape metrics such as **Mean**, **Variance**, **SHDI**, and **LSI**.
+`gdiv_calculator` provides efficient raster metric computation for environmental and biodiversity studies.
+It supports both simple statistical metrics and categorical landscape metrics.
 
 Core features include:
-- modular C++ design
+- modular C++ design for maintainability
 - Built on [GDAL](https://gdal.org) for raster access
 - Ready for integration with Python bindings
 - Memory-efficient block reading for large rasters
-
+- Example Python integration (.py) for automated metric table generation
+  
 ## Directory Structure
 ```
 gdiv_calculator/
 ├── CMakeLists.txt
 ├── include/
-│ └── gdiv_toolbox.h # Public API declarations
+│ ├── gdiv_toolbox.h # Public API declarations
+│ └── gdiv/runner/ # Runner headers (GDAL IO, tiling, main loop)
+│ ├── gdal_io.h
+│ ├── tiler.h
+│ └── runner.h
 ├── src/
-│ ├── gdiv_toolbox.cpp # Core raster statistics
-│ ├── gdiv_utils.cpp/.h # Utilities (GDAL init, NODATA handling, etc.)
-│ ├── msr.cpp # Mean-Std-Raster computation
-│ ├── shdi.cpp # Shannon Diversity Index (planned)
-│ ├── lsi.cpp # Landscape Shape Index (planned)
-│ └── export.h # Export macros for DLL builds
+│ ├── gdiv_toolbox.cpp # C API entry (msr/shdi/lsi dispatch)
+│ ├── gdiv_utils.cpp/.h # GDAL init, NODATA handling, etc.
+│ ├── msr.cpp # Mean-Std raster computation
+│ ├── shdi.cpp # Shannon Diversity Index computation
+│ ├── gdiv_lsi.cpp # Landscape Shape Index computation
+│ └── runner/ # High-performance raster loop backend
+│ ├── gdal_io.cpp
+│ ├── tiler.cpp
+│ └── runner.cpp
 ├── tests/
-│ └── test_basic.cpp # Example test for MSR computation
+│ └── test_basic.cpp # Example test for MSR calculation
 ├── example_raster/
-│ └── T5FPCF.tiff # An example raster dataset
-└── dist/
-└── Release/ # Compiled DLLs and executables
+│ └── T5FPCF.tiff # Example raster dataset
+├── dist/
+│ ├── Debug/ # Debug build outputs
+│ ├── Release/ # Release build outputs
+│ └── results_metrics.csv # Example output from Python script
+└── compile_gdiv.py # Python example for DLL integration
+
 ```
 
 
@@ -62,44 +74,72 @@ cmake -S . -B build -A x64 `
 # (3) Compile in Release mode
 cmake --build build --config Release
 ```
+Build artifacts will be placed in:
 
-## Run example 
+```
+dist/Release/gdiv_toolbox.dll
+```
 
-After successful build, run the test binary:'
+## Run example (C++ test)
+
+After successful build, run the test binary:
 
 ```Markdown
 cd dist/Release
 .\test_basic.exe "E:\gdiv_calculator\example_raster\T5FPCF.tiff"
 ```
 
+## Run example (Python test)
+You can now call the compiled C++ DLL directly from Python to compute metrics and export them to CSV.
+Usage:
+
+```
+python compile_gdiv.py
+```
+# What is does:
+- Scans all subfolders under `DATA/` (each factor = one folder)
+- For each site (raster file), computes:
+  - `{factor}_msr` (standard deviation)
+  - `{factor}_mean`
+  - `{factor}_shdi`(if factor categorical and in SHDI whitelist)
+  - `{factor}_lsi`(if factor in LSI whitelist)
+- Write results to `dist/results_metrics.csv`
+
+# Main features
+- Uses `ctypes` to bind `gdiv_toolbox.dll`
+- Supports SHDI class configuration and optional proportion columns
+- Logs warnings when GDAL fails for specific sites
+- Works on both Debug and Release builds
+  
 ## How to add new functions?
 
 If you want to implement new raster indices (let's take LSI for example):
 
-Create a new file under src/, e.g. src/lsi.cpp
+1. Create a new file under src/, e.g. src/lsi.cpp
 
-Declare its function prototype in include/gdiv_toolbox.h
+2. Declare its function prototype in include/gdiv_toolbox.h
 
-Implement the logic using GDAL’s raster API
+3. Implement the logic using GDAL’s raster API
 
-Add the file to CMakeLists.txt
+4. Add the file to CMakeLists.txt
 
-Rebuild the project with CMake
+5. Rebuild the project with CMake
 
 Example:
 
 ```cpp
-// src/lsi.cpp
+// src/frag.cpp
 #include "gdiv_toolbox.h"
 #include <cmath>
 
-int gdiv_calculate_lsi(const char* path, const RasterOptions* opt, double* lsi_value) {
-    // Implement LSI formula using pixel connectivity or edge detection
-    return 0;
+
+int frag_compute(const char* path, const RasterOptions* opt, double* out_val, uint64_t* valid) {
+// TODO: Implement your custom raster metric
+return 0;
 }
 ```
 
-## Testing
+## Testing for new functions
 
 To add a new test:
 
@@ -111,19 +151,23 @@ Add it to CMake as an executable
 
 ```bash
 cmake --build build --config Release
-.\dist\Release\test_lsi.exe
+.\dist\Release\test_frag.exe
 ```
 
 ## Maintenance Notes
 
-All functions should handle NODATA properly using resolve_nodata() from gdiv_utils.h
+- Always handle NODATA properly using resolve_nodata() in gdiv_utils.h
+- Always call gdal_init_once() before reading rasters
+- Keep functions small and modular; one metric per file
+- Use consistent naming: gdiv_calculate_*
+- Use English comments for clarity
+- For large rasters, prefer the runner subsystem for tile-based iteration
 
-Always use gdiv_init_gdal_once() before reading rasters
 
-Keep functions small and modular; do not mix multiple index calculations in one file
+## License
 
-Use English comments and follow consistent naming: gdiv_calculate_*
-
+MIT License — free to use, modify, and redistribute with attribution.
+Built with GDAL © Open Source Geospatial Foundation.
 
 
 
