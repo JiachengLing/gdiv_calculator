@@ -6,7 +6,7 @@
 
 // ==========
 int msr_compute(const char* path, const RasterOptions* opt,
-                double* mean, double* stdv, double* vmin, double* vmax, uint64_t* valid);
+                double* mean, double* var, double* vmin, double* vmax, uint64_t* valid);
 
 int shdi_compute(
   const char* path,
@@ -37,12 +37,12 @@ extern "C" {
 
     // --- MSR ---
     GDIV_API int gdiv_calculate_msr(const char* path, const RasterOptions* opt,
-                                    double* mean, double* stdv, double* vmin, double* vmax, uint64_t* valid)
+                                    double* mean, double* var, double* vmin, double* vmax, uint64_t* valid)
     {
         try {
             gdal_init_once();
             set_gdal_throw();
-            return msr_compute(path, opt, mean, stdv, vmin, vmax, valid);
+            return msr_compute(path, opt, mean, var, vmin, vmax, valid);
         } catch (...) {
             return 9;
         }
@@ -78,3 +78,4 @@ extern "C" {
     }
 
 } // extern "C"
+
